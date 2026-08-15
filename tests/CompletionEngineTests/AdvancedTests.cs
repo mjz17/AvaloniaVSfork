@@ -8,15 +8,98 @@ namespace CompletionEngineTests
     public class AdvancedTests : XamlCompletionTestBase
     {
         [Fact]
+        public void ResourceKey_TypeFiltered_Brush_Context_Shows_Only_Compatible_Keys()
+        {
+            AssertSingleCompletion("<UserControl Background=\"{StaticResource ", "MyB", "MyBrush");
+        }
+
+        [Fact]
+        public void ResourceKey_TypeFiltered_Brush_Context_Excludes_Thickness_Keys()
+        {
+            var comp = GetCompletionsFor("<UserControl Background=\"{StaticResource InlineTh");
+            // A Thickness resource is not assignable to a brush property and must not be offered.
+            // (The engine may produce no completions at all in that case.)
+            if (comp != null)
+                Assert.DoesNotContain(comp.Completions, c => c.InsertText == "InlineThickness");
+        }
+
+        [Fact]
+        public void ResourceKey_TypeFiltered_Thickness_Context_Shows_Only_Compatible_Keys()
+        {
+            AssertSingleCompletion("<UserControl BorderThickness=\"{StaticResource ", "InlineTh", "InlineThickness");
+            AssertSingleCompletion("<UserControl BorderThickness=\"{StaticResource ", "FlipViewButtonBorderThemeTh", "FlipViewButtonBorderThemeThickness");
+        }
+
+        [Fact]
+        public void ResourceKey_TypeFiltered_Thickness_Context_Excludes_Brush_Keys()
+        {
+            var comp = GetCompletionsFor("<UserControl BorderThickness=\"{StaticResource Inli");
+            Assert.NotNull(comp);
+            // A brush resource is not assignable to a Thickness property and must not be offered.
+            Assert.DoesNotContain(comp.Completions, c => c.InsertText == "InlineBrush");
+        }
+
+        [Fact]
+        public void ResourceKey_TypeFiltered_Color_Resource_Not_Offered_For_Brush_Property()
+        {
+            var comp = GetCompletionsFor("<UserControl Background=\"{StaticResource TextFill");
+            Assert.NotNull(comp);
+            // TextFillColor* resources are compiled as Avalonia.Media.Color values and therefore
+            // are not assignable to a brush property.
+            Assert.DoesNotContain(comp.Completions, c => c.InsertText == "TextFillColorPrimary");
+        }
+
+        [Fact]
+        public void ResourceKey_TypeFiltered_Color_Resource_Offered_For_Color_Property()
+        {
+            var comp = GetCompletionsFor("<SolidColorBrush Color=\"{StaticResource TextFill");
+            Assert.NotNull(comp);
+            Assert.Contains(comp.Completions, c => c.InsertText == "TextFillColorPrimary");
+        }
+
+        [Fact]
         public void WellKnown_Brushes_Should_Be_Completed()
         {
             AssertSingleCompletion("<UserControl Background=\"", "Re", "Red");
         }
 
         [Fact]
-        public void WellKnown_ThemeKeys_Should_Be_Completed()
+        public void Hardcoded_Theme_Keys_Are_No_Longer_Offered()
         {
-            AssertSingleCompletion("<UserControl Background=\"{DynamicResource ", "Theme", "ThemeBackgroundBrush");
+            // The hardcoded common resource key list is disabled; only keys extracted from
+            // the compiled assemblies' resource dictionaries should be offered.
+            var comp = GetCompletionsFor("<UserControl Background=\"{DynamicResource Theme");
+            // (The engine may produce no completions at all in that case.)
+            if (comp != null)
+                Assert.DoesNotContain(comp.Completions, c => c.InsertText == "ThemeBackgroundBrush");
+        }
+
+        [Fact]
+        public void ResourceKey_Defined_In_Current_Document_Should_Be_Completed()
+        {
+            AssertSingleCompletion(
+                "<UserControl><UserControl.Resources><SolidColorBrush x:Key=\"MyBrush\" Color=\"Red\"/></UserControl.Resources><Button Background=\"{StaticResource ",
+                "MyB", "MyBrush");
+        }
+
+        [Fact]
+        public void ResourceKey_Explicit_Attribute_Form_Should_Be_Completed()
+        {
+            // Avalonia's extensions expose the key through the ResourceKey property.
+            AssertSingleCompletion("<UserControl Background=\"{StaticResource ResourceKey=", "MyB", "MyBrush");
+            AssertSingleCompletion("<UserControl Background=\"{DynamicResource ResourceKey=", "Inli", "InlineBrush");
+        }
+
+        [Fact]
+        public void ResourceKey_Compiled_In_Assembly_Should_Be_Completed()
+        {
+            AssertSingleCompletion("<UserControl Background=\"{StaticResource ", "Inli", "InlineBrush");
+        }
+
+        [Fact]
+        public void DynamicResource_Compiled_Key_Should_Be_Completed()
+        {
+            AssertSingleCompletion("<UserControl Background=\"{DynamicResource ", "BrushB", "BrushByColorName");
         }
 
         [Fact]

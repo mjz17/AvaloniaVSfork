@@ -173,6 +173,94 @@ public class CompletionEngine
 
     public MetadataHelper Helper { get; set; } = new MetadataHelper();
 
+    /// <summary>Matches a start element tag carrying an <c>x:Key</c> attribute, e.g.
+    /// <c>&lt;SolidColorBrush x:Key="MyBrush" Color="Red"/&gt;</c>. The captured element tag
+    /// is used to derive the resource value's type.</summary>
+    private static readonly Regex ResourceElementRegex = new(
+        @"<\s*(?'tag'[\w:.]+)(?<attrs>[^>]*x:Key\s*=\s*[""'](?<key>[^""']+)[""'][^>]*?)>", RegexOptions.Compiled);
+
+    /// <summary>Markup extensions that reference resource keys.</summary>
+    private static bool IsResourceExtension(MetadataType type) =>
+        type.Name == "StaticResourceExtension"
+        || type.Name == "DynamicResourceExtension"
+        || type.Name == "ThemeResourceExtension";
+
+    /// <summary>Resource keys declared in the current document, along with the resource value's
+    /// type full name (null when it cannot be determined).</summary>
+    private IEnumerable<(string Key, string? TypeFullName)> GetDocumentResourceKeys(string fullText)
+    {
+        foreach (Match m in ResourceElementRegex.Matches(fullText))
+        {
+            var key = m.Groups["key"].Value;
+            if (key.Length == 0 || key[0] == '{')
+                continue;
+            yield return (key, ResolveDocumentKeyType(m.Groups["tag"].Value));
+        }
+    }
+
+    private string? ResolveDocumentKeyType(string tag)
+    {
+        // x:* directives cannot be resolved through clr namespaces; map the common primitives.
+        switch (tag)
+        {
+            case "x:String": return "System.String";
+            case "x:Int32": return "System.Int32";
+            case "x:Int64": return "System.Int64";
+            case "x:Double": return "System.Double";
+            case "x:Boolean": return "System.Boolean";
+            case "x:Array": return "System.Array";
+        }
+        return Helper.LookupType(tag)?.FullName;
+    }
+
+    /// <summary>Adds completions for resource keys that match the typed prefix, filtering out
+    /// keys whose resource value type cannot be assigned to <paramref name="targetType"/>.
+    /// Keys defined in the current document are always offered (when untyped) because they are
+    /// typically few; unknown-typed keys from compiled assemblies are hidden in a typed context
+    /// to cut down the noise of large theme key sets.</summary>
+    private void AddResourceKeyCompletions(List<Completion> completions, string prefix, string fullText, MetadataType? targetType)
+    {
+        var existing = new HashSet<string>(completions.Select(c => c.DisplayText), StringComparer.Ordinal);
+
+        void AddIfCompatible(string key, string? typeFullName, bool filterUnknown)
+        {
+            if (!key.StartsWith(prefix, StringComparison.Ordinal) || !existing.Add(key))
+                return;
+            if (targetType != null)
+            {
+                if (typeFullName == null)
+                {
+                    if (filterUnknown)
+                        return;
+                }
+                else if (!IsResourceKeyTypeCompatible(typeFullName, targetType))
+                {
+                    return;
+                }
+            }
+            // Resource keys are constants; use the static-property kind so the IDE shows the
+            // constant icon instead of the element/class icon.
+            completions.Add(new Completion(key, CompletionKind.StaticProperty));
+        }
+
+        foreach (var (key, typeFullName) in GetDocumentResourceKeys(fullText))
+            AddIfCompatible(key, typeFullName, filterUnknown: false);
+
+        if (Helper.Metadata is { } metadata)
+        {
+            foreach (var kv in metadata.ResourceKeys)
+                AddIfCompatible(kv.Key, kv.Value, filterUnknown: true);
+        }
+    }
+
+    private bool IsResourceKeyTypeCompatible(string resourceTypeFullName, MetadataType targetType)
+    {
+        var resourceType = Helper.Metadata?.LookupTypeByFullName(resourceTypeFullName);
+        if (resourceType == null)
+            return false;
+        return IsElementAssignableTo(resourceType, targetType.FullName);
+    }
+
     public static Dictionary<string, string> GetNamespaceAliases(string xml)
     {
         var rv = new Dictionary<string, string>();
@@ -1101,6 +1189,13 @@ public class CompletionEngine
                     {
                         completions.AddRange(GetHintCompletions(t, attribName));
                     }
+
+                    // {StaticResource}/{DynamicResource} also complete keys defined in the current
+                    // document and keys compiled into the referenced assemblies' resource dictionaries.
+                    if (IsResourceExtension(t))
+                    {
+                        AddResourceKeyCompletions(completions, attribName, fullText, property?.Type);
+                    }
                 }
                 else if (attribName.Contains('.'))
                 {
@@ -1163,10 +1258,20 @@ public class CompletionEngine
                 var start = data.Substring(ext.CurrentValueStart);
                 completions.AddRange(GetHintCompletions(prop.Type, start, currentAssemblyName, fullText, state));
             }
+
+            // {StaticResource ResourceKey=...}/{DynamicResource ResourceKey=...} explicit-key form.
+            if (IsResourceExtensionName(elementName) && ext.AttributeName == "ResourceKey")
+            {
+                var start = data.Substring(ext.CurrentValueStart);
+                AddResourceKeyCompletions(completions, start, fullText, property?.Type);
+            }
         }
 
         return forcedStart ?? ext.CurrentValueStart;
     }
+
+    private static bool IsResourceExtensionName(string? elementName) =>
+        elementName == "StaticResource" || elementName == "DynamicResource" || elementName == "ThemeResource";
 
     public static bool ShouldTriggerCompletionListOn(char typedChar)
     {

@@ -1,0 +1,7 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="InlineBrush" Color="Red"/>
+        <SolidColorBrush x:Key="BrushByColorName" Color="Blue"/>
+        <Thickness x:Key="InlineThickness">2,2,2,2</Thickness>
+    </UserControl.Resources>
+</UserControl>

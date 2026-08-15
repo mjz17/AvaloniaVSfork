@@ -8,9 +8,15 @@ public class Metadata
 {
     readonly Dictionary<string, Dictionary<string, MetadataType>> _namespaces = new();
     readonly Dictionary<string, string> _inverseNamespace = new();
+    readonly Dictionary<string, MetadataType> _typesByFullName = new();
 
     public IReadOnlyDictionary<string, Dictionary<string, MetadataType>> Namespaces => _namespaces;
     public IReadOnlyDictionary<string, string> InverseNamespace => _inverseNamespace;
+
+    /// <summary>Resolves a fully-qualified type name (e.g. <c>Avalonia.Media.SolidColorBrush</c>)
+    /// to its metadata, or null when the type is not loaded.</summary>
+    public MetadataType? LookupTypeByFullName(string fullName) =>
+        _typesByFullName.GetValueOrDefault(fullName);
 
     /// <summary>
     /// Style classes keyed by the full name of their selector's target type.
@@ -22,10 +28,17 @@ public class Metadata
     /// </summary>
     public HashSet<string> GlobalStyleClasses { get; } = new();
 
+    /// <summary>
+    /// Resource keys defined by XAML resource dictionaries compiled into the loaded assemblies,
+    /// mapped to the resource value's type full name (null when unknown).
+    /// </summary>
+    public Dictionary<string, string?> ResourceKeys { get; } = new();
+
     public void AddType(string ns, MetadataType type)
     {
         _namespaces.GetOrCreate(ns)[type.Name] = type;
         _inverseNamespace[type.FullName] = ns;
+        _typesByFullName[type.FullName] = type;
     }
 
     /// <summary>
@@ -39,6 +52,9 @@ public class Metadata
         foreach (var x in metadata._inverseNamespace)
             if (!_inverseNamespace.ContainsKey(x.Key))
                 _inverseNamespace.Add(x.Key, x.Value);
+        foreach (var kv in metadata._typesByFullName)
+            if (!_typesByFullName.ContainsKey(kv.Key))
+                _typesByFullName.Add(kv.Key, kv.Value);
         foreach (var kv in metadata.StyleClasses)
         {
             if (StyleClasses.TryGetValue(kv.Key, out var existing))
@@ -47,6 +63,9 @@ public class Metadata
                 StyleClasses.Add(kv.Key, new HashSet<string>(kv.Value));
         }
         GlobalStyleClasses.UnionWith(metadata.GlobalStyleClasses);
+        foreach (var kv in metadata.ResourceKeys)
+            if (!ResourceKeys.ContainsKey(kv.Key))
+                ResourceKeys.Add(kv.Key, kv.Value);
     }
 }
 

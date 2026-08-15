@@ -2,6 +2,7 @@
         x:Class="CompletionEngineTests.TestCompiledTheme"
         >
     <Styles.Resources>
+        <SolidColorBrush x:Key="MyBrush" Color="Red"/>
         <ControlTheme x:Key="{x:Type Button}" TargetType="Button">
             <Style Selector="^.ctAccent">
                 <Setter Property="Background" Value="Red"/>

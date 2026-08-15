@@ -41,6 +41,7 @@
       <AvaloniaResource Include="Test.bmp" />
       <AvaloniaResource Include="Test.xaml" />
       <AvaloniaResource Include="TestCompiledTheme.xaml" />
+      <AvaloniaResource Include="TestWithResources.xaml" />
     </ItemGroup>
 
     <ItemGroup>

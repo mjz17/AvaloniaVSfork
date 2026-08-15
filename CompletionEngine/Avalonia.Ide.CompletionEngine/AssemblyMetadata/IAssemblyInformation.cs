@@ -21,6 +21,13 @@ public interface IAssemblyInformation
     /// Item1 is the selector's target type full name, or null for a global (type-less) class selector.
     /// </summary>
     IEnumerable<(string? TypeFullName, string ClassName)> StyleClasses { get; }
+
+    /// <summary>
+    /// Resource keys defined by XAML resource dictionaries compiled into this assembly
+    /// (e.g. <c>x:Key</c> entries in App.axaml, themes and control templates).
+    /// Item2 is the resource value's type full name, or null when it could not be determined.
+    /// </summary>
+    IEnumerable<(string Key, string? TypeFullName)> ResourceKeys { get; }
 }
 
 public interface ICustomAttributeInformation

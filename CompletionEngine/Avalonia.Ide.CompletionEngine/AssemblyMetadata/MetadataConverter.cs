@@ -213,6 +213,16 @@ public static class MetadataConverter
                     classes.Add(className);
                 }
             }
+
+            // Collect resource keys defined by XAML resource dictionaries compiled into this
+            // assembly (and its compiled deferred resources) so that {StaticResource}/{DynamicResource}
+            // keys can be completed. Prefer an entry that carries a known value type over an
+            // earlier one that does not (e.g. when the same key exists in several assemblies).
+            foreach (var (key, typeFullName) in asm.ResourceKeys)
+            {
+                if (!metadata.ResourceKeys.TryGetValue(key, out var existing) || existing is null)
+                    metadata.ResourceKeys[key] = typeFullName;
+            }
         }
 
         var at = types.Values.ToArray();
@@ -607,9 +617,9 @@ public static class MetadataConverter
             },
             new MetadataType(typeof(System.Uri).FullName!),
             (typeType = new MetadataType(typeof(System.Type).FullName!)),
-            new MetadataType("Avalonia.Media.IBrush"),
-            new MetadataType("Avalonia.Media.Imaging.IBitmap"),
-            new MetadataType("Avalonia.Media.IImage"),
+            new MetadataType("Avalonia.Media.IBrush") { FullName = "Avalonia.Media.IBrush" },
+            new MetadataType("Avalonia.Media.Imaging.IBitmap") { FullName = "Avalonia.Media.Imaging.IBitmap" },
+            new MetadataType("Avalonia.Media.IImage") { FullName = "Avalonia.Media.IImage" },
             (int32Type = new MetadataType(typeof(int).FullName!)
             {
                 HasHintValues = false,
@@ -853,32 +863,36 @@ public static class MetadataConverter
             typeExtension.SupportCtorArgument = MetadataTypeCtorArgument.Type;
         }
 
-        //TODO: may be make it to load from assembly resources
-        string[] commonResKeys = new string[] {
-//common brushes
-"ThemeBackgroundBrush","ThemeBorderLowBrush","ThemeBorderMidBrush","ThemeBorderHighBrush",
-"ThemeControlLowBrush","ThemeControlMidBrush","ThemeControlHighBrush",
-"ThemeControlHighlightLowBrush","ThemeControlHighlightMidBrush","ThemeControlHighlightHighBrush",
-"ThemeForegroundBrush","ThemeForegroundLowBrush","HighlightBrush",
-"ThemeAccentBrush","ThemeAccentBrush2","ThemeAccentBrush3","ThemeAccentBrush4",
-"ErrorBrush","ErrorLowBrush",
-//some other usefull
-"ThemeBorderThickness", "ThemeDisabledOpacity",
-"FontSizeSmall","FontSizeNormal","FontSizeLarge"
-            };
+        // TODO: may be make it to load from assembly resources.
+        // The hardcoded common resource key list is disabled: with third-party themes the
+        // keys are wrong/useless, and resource keys are now extracted from the compiled
+        // assemblies' resource dictionaries (see ResourceKeyExtractor). SupportCtorArgument
+        // stays HintValues so that the extracted keys are still offered inside {StaticResource}.
+        //string[] commonResKeys = new string[] {
+        ////common brushes
+        //"ThemeBackgroundBrush","ThemeBorderLowBrush","ThemeBorderMidBrush","ThemeBorderHighBrush",
+        //"ThemeControlLowBrush","ThemeControlMidBrush","ThemeControlHighBrush",
+        //"ThemeControlHighlightLowBrush","ThemeControlHighlightMidBrush","ThemeControlHighlightHighBrush",
+        //"ThemeForegroundBrush","ThemeForegroundLowBrush","HighlightBrush",
+        //"ThemeAccentBrush","ThemeAccentBrush2","ThemeAccentBrush3","ThemeAccentBrush4",
+        //"ErrorBrush","ErrorLowBrush",
+        ////some other usefull
+        //"ThemeBorderThickness", "ThemeDisabledOpacity",
+        //"FontSizeSmall","FontSizeNormal","FontSizeLarge"
+        //};
 
         if (avaloniaBaseType.TryGetValue("Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension", out MetadataType? dynRes))
         {
             dynRes.SupportCtorArgument = MetadataTypeCtorArgument.HintValues;
-            dynRes.HasHintValues = true;
-            dynRes.HintValues = commonResKeys;
+            //dynRes.HasHintValues = true;
+            //dynRes.HintValues = commonResKeys;
         }
 
         if (avaloniaBaseType.TryGetValue("Avalonia.Markup.Xaml.MarkupExtensions.StaticResourceExtension", out MetadataType? stRes))
         {
             stRes.SupportCtorArgument = MetadataTypeCtorArgument.HintValues;
-            stRes.HasHintValues = true;
-            stRes.HintValues = commonResKeys;
+            //stRes.HasHintValues = true;
+            //stRes.HintValues = commonResKeys;
         }
 
         //brushes

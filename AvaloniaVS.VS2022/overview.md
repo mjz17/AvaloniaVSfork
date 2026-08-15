@@ -8,6 +8,10 @@ AxamlCraft 是一款基于 AvaloniaVS **旧开源版本**深度定制的 **AXAML
   - 在 `Classes=""` 属性内直接补全样式类名（支持空格分隔的多类名、精确/基类/接口/全局候选）
   - 支持 `Classes.class="{Binding}"` 绑定语法，在 `Classes.` 点号后自动补全样式类并生成绑定
   - 自动过滤伪类（`:pseudo`），只提示真实存在的样式类
+- **资源键补全（Resource Key Completion）**
+  - 在 `{StaticResource ...}` / `{DynamicResource ...}` 中补全资源键
+  - 从编译后的程序集资源字典中提取键，兼容第三方主题
+  - 按目标属性类型过滤（如画刷属性只提示画刷资源），并支持 `ResourceKey=` 显式属性形式与当前文档内 `x:Key` 资源
 - **AXAML 实时预览（Live Previewer）**
   - 编辑即预览，无需手动刷新
 
@@ -16,6 +20,7 @@ AxamlCraft 是一款基于 AvaloniaVS **旧开源版本**深度定制的 **AXAML
 - AXAML 实时预览（Previewer / Designer）
 - AXAML 智能代码补全（IntelliSense）
 - **样式类补全**（特色功能）
+- **资源键补全**（特色功能，类型感知过滤）
 - 绑定表达式补全（`{Binding ...}`）
 - AXAML 文件图标
 - 代码片段（Snippets）
