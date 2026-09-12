@@ -464,7 +464,7 @@ namespace AvaloniaVS.Views
             if (IsPaused)
             {
                 pausedMessage.Visibility = Visibility.Visible;
-                Process.Stop();
+                await Process.StopAsync();
             }
             else if (!Process.IsRunning && IsLoaded)
             {
@@ -864,7 +864,7 @@ namespace AvaloniaVS.Views
                     {
                         Log.Logger.Debug("Waiting for StartProcessAsync to finish");
                         await _startingProcess.WaitAsync();
-                        Process.Stop();
+                        await Process.StopAsync();
                         StartProcessAsync().FireAndForget();
                     }
                     finally

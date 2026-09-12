@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -13,6 +14,7 @@ using Avalonia.Remote.Protocol.Designer;
 using Avalonia.Remote.Protocol.Input;
 using Avalonia.Remote.Protocol.Viewport;
 using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Threading;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -257,32 +259,24 @@ namespace AvaloniaVS.Services
         }
 
         /// <summary>
-        /// Stops the previewer process.
+        /// Stops the previewer process and waits for it to exit.
         /// </summary>
-        public void Stop()
+        public async Task StopAsync()
         {
             _log.Verbose("Started PreviewerProcess.Stop()");
             _log.Information("Stopping previewer process");
 
-            _listener?.Dispose();
-            _listener = null;
+            Cleanup();
 
-            if (_connection is IAvaloniaRemoteTransportConnection connection)
-            {
-                _connection = null;
-                connection.OnMessage -= ConnectionMessageReceived;
-                connection.OnException -= ConnectionExceptionReceived;
-                connection.Dispose();
-            }
-
-            if (_process?.HasExited == false)
+            var process = Interlocked.Exchange(ref _process, null);
+            if (process != null && !process.HasExited)
             {
                 _log.Debug("Killing previewer process");
 
                 try
                 {
-                    // Kill the process. Do not set _process to null here, wait for ProcessExited to be called.
-                    _process.Kill();
+                    process.Kill();
+                    await process.WaitForExitAsync();
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -293,6 +287,19 @@ namespace AvaloniaVS.Services
             _executablePath = null;
 
             _log.Verbose("Finished PreviewerProcess.Stop()");
+        }
+
+        private void Cleanup()
+        {
+            var listener = Interlocked.Exchange(ref _listener, null);
+            listener?.Dispose();
+
+            if (Interlocked.Exchange(ref _connection, null) is IAvaloniaRemoteTransportConnection connection)
+            {
+                connection.OnMessage -= ConnectionMessageReceived;
+                connection.OnException -= ConnectionExceptionReceived;
+                connection.Dispose();
+            }
         }
 
         /// <summary>
@@ -364,7 +371,7 @@ namespace AvaloniaVS.Services
         /// <summary>
         /// Stops the process and disposes of all resources.
         /// </summary>
-        public void Dispose() => Stop();
+        public void Dispose() => StopAsync().FireAndForget();
 
         void ILogEventEnricher.Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
         {
@@ -509,7 +516,7 @@ namespace AvaloniaVS.Services
         private void OnProcessExited(object sender, EventArgs e)
         {
             _log.Information("Process exited");
-            Stop();
+            Cleanup();
             ProcessExited?.Invoke(this, EventArgs.Empty);
         }
 
